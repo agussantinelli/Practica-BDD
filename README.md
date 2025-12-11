@@ -306,19 +306,17 @@
     COMMIT;
  </code></pre>
 
-    <br><br><br>
-    <hr>
+   <br><br><br>
     <hr>
     <br><br><br>
 
-    <!-- PRÁCTICA 10 -->
-    <h2>🔐 Práctica 10: DCL (Seguridad)</h2>
+   <h2>🔐 Práctica 10: DCL (Seguridad)</h2>
     <p><strong>BASE DE DATOS:</strong> <code>AGENCIA_PERSONAL</code></p>
     <br>
 
-    <h3>🔹 Ejercicios Básicos: Usuario y Contraseña</h3>
+   <h3>🔹 Ejercicios Básicos: Usuario y Contraseña</h3>
     
-    <pre><code>
+   <pre><code>
     /* 1. Crear Usuario */
     CREATE USER 
         usuario@localhost 
@@ -330,11 +328,11 @@
         'usuario'@'localhost' = PASSWORD('entrar');
     </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Gestión de Permisos</h3>
+   <h3>🔹 Gestión de Permisos</h3>
     
-    <pre><code>
+   <pre><code>
     /* 3. Permiso SELECT global */
     GRANT SELECT 
     ON 
@@ -353,36 +351,35 @@
         usuario@localhost;
     </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Seguridad con Vistas</h3>
+   <h3>🔹 Seguridad con Vistas</h3>
     
-    <pre><code>
+   <pre><code>
     GRANT UPDATE ON agencia_personal.vw_contratos TO usuario@localhost;
     GRANT INSERT ON agencia_personal.vw_contratos TO usuario@localhost;
     GRANT DELETE ON agencia_personal.vw_contratos TO usuario@localhost;
     </code></pre>
 
-    <br><br><br>
+   <br><br><br>
     <hr>
     <hr>
     <br><br><br>
 
-    <!-- PRÁCTICA 11 -->
-    <h2>⚡ Práctica 11: TCL (Control de Transacciones)</h2>
+   <h2>⚡ Práctica 11: TCL (Control de Transacciones)</h2>
     <p><strong>BASE DE DATOS:</strong> <code>AFATSE</code></p>
     <br>
 
-    <h3>🔹 1. Autocommit Activado</h3>
+   <h3>🔹 1. Autocommit Activado</h3>
     <pre><code>
     SET AUTOCOMMIT = 1;
     
-    SELECT @@autocommit;
-    </code></pre>
+   SELECT @@autocommit;
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 2 y 3. Comportamiento sin Transacción Explícita</h3>
+   <h3>🔹 2 y 3. Comportamiento sin Transacción Explícita</h3>
     <pre><code>
     /* INSERTAR */
     INSERT INTO alumnos (
@@ -392,18 +389,17 @@
         16817618, 'Clotilde', 'Diez', 11111111, 'cloti@yahoo.com', 'Rioja 2030'
     );
 
-    /* ELIMINAR */
-    DELETE FROM 
+   DELETE FROM 
         alumnos 
     WHERE 
         dni = 16817618;
 
     /* Resultado: Los cambios son visibles inmediatamente en otras conexiones. */
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 4 y 5. START TRANSACTION con ROLLBACK / COMMIT</h3>
+   <h3>🔹 4 y 5. START TRANSACTION con ROLLBACK / COMMIT</h3>
     <pre><code>
     /* CASO ROLLBACK (Deshacer) */
     START TRANSACTION;
@@ -413,63 +409,62 @@
     -- El alumno desaparece.
 
     /* CASO COMMIT (Confirmar) */
-    START TRANSACTION;
+   START TRANSACTION;
         INSERT INTO alumnos ...;
         -- En otra sesión NO se ve.
     COMMIT;
     -- Ahora el alumno ES visible para todos.
     </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 8. Modo Autocommit = 0</h3>
+   <h3>🔹 8. Modo Autocommit = 0</h3>
     <pre><code>
     SET AUTOCOMMIT = 0;
 
-    INSERT INTO alumnos ...;
+   INSERT INTO alumnos ...;
     -- No es visible fuera de esta sesión.
+    
+   COMMIT;
+   -- Se confirma y se hace visible.
+   </code></pre>
 
-    COMMIT;
-    -- Se confirma y se hace visible.
-    </code></pre>
+   <br><hr><br>
 
-    <br><hr><br>
-
-    <h3>🔹 9 y 10. Uso de SAVEPOINT</h3>
+   <h3>🔹 9 y 10. Uso de SAVEPOINT</h3>
     <pre><code>
     START TRANSACTION;
 
         /* Paso 1: Insertar alumno */
-        INSERT INTO alumnos (dni, ...) VALUES (16817618, ...);
+   INSERT INTO alumnos (dni, ...) VALUES (16817618, ...);
 
         /* Paso 2: Marcar punto */
-        SAVEPOINT alumno;
+   SAVEPOINT alumno;
 
         /* Paso 3: Insertar inscripción */
-        INSERT INTO inscripciones ...;
+   INSERT INTO inscripciones ...;
 
         /* Paso 4: Deshacer solo la inscripción (volver al punto 'alumno') */
-        ROLLBACK TO alumno;
+   ROLLBACK TO alumno;
 
         /* Paso 5: Confirmar la transacción */
-        COMMIT;
+ COMMIT;
 
     /* Resultado: El alumno queda guardado, la inscripción NO. */
-    </code></pre>
+   </code></pre>
 
-    <br><br><br>
+   <br><br><br>
     <hr>
     <hr>
-    <br><br><br>
+   <br><br><br>
 
-    <!-- PRÁCTICA 12 -->
-    <h2>⚙️ Práctica 12: Stored Procedures y Functions</h2>
+   <h2>⚙️ Práctica 12: Stored Procedures y Functions</h2>
     <p><strong>BASE DE DATOS:</strong> <code>AFATSE</code></p>
-    <br>
+   <br>
 
-    <h3>🔹 Ejercicio 1: SP Básico con Tabla Temporal</h3>
+   <h3>🔹 Ejercicio 1: SP Básico con Tabla Temporal</h3>
     
-    <pre><code>
+   <pre><code>
     DELIMITER //
 
     CREATE PROCEDURE plan_lista_precios_actual()
@@ -505,13 +500,13 @@
     END //
 
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 2 y 3: SP con Parámetros y Reutilización</h3>
+   <h3>🔹 Ejercicio 2 y 3: SP con Parámetros y Reutilización</h3>
     
-    <pre><code>
+   <pre><code>
     /* Crear SP con parámetro fecha */
     DELIMITER //
 
@@ -558,13 +553,13 @@
         CALL plan_lista_precios_a_fecha(CURRENT_DATE);
     END //
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicios 4 y 5: Funciones</h3>
+   <h3>🔹 Ejercicios 4 y 5: Funciones</h3>
     
-    <pre><code>
+   <pre><code>
     SET GLOBAL log_bin_trust_function_creators = 1;
 
     DELIMITER //
@@ -589,13 +584,13 @@
 
     /* Prueba */
     SELECT plan_valor('Marketing 3', '2015-01-02');
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 6: Parámetros de Salida (OUT)</h3>
+   <h3>🔹 Ejercicio 6: Parámetros de Salida (OUT)</h3>
     
-    <pre><code>
+   <pre><code>
     DELIMITER //
 
     CREATE PROCEDURE alumnos_pagos_deudas_a_fecha(
@@ -631,13 +626,13 @@
     END //
 
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 8, 9 y 10: Transacciones en SPs</h3>
+   <h3>🔹 Ejercicio 8, 9 y 10: Transacciones en SPs</h3>
     
-    <pre><code>
+   <pre><code>
     DELIMITER //
 
     CREATE PROCEDURE alumno_inscrip_con_validacion_2(
@@ -704,13 +699,13 @@
     END //
 
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 11: Modularización (Stock)</h3>
+   <h3>🔹 Ejercicio 11: Modularización (Stock)</h3>
     
-    <pre><code>
+   <pre><code>
     /* 1. SP Genérico */
     DELIMITER //
     CREATE PROCEDURE `stock_movimiento`(
@@ -774,21 +769,20 @@
         CALL stock_movimiento(cod_mat, (-1) * cant_movida, stock);
     END //
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><br><br>
+   <br><br><br>
     <hr>
     <hr>
-    <br><br><br>
+   <br><br><br>
 
-    <!-- TRIGGERS -->
-    <h2>🔔 Triggers</h2>
+   <h2>🔔 Triggers</h2>
     <p><strong>BASE DE DATOS:</strong> <code>AFATSE</code></p>
-    <br>
+   <br>
 
-    <h3>🔹 Ejercicio 1: Auditoría de Alumnos</h3>
+   <h3>🔹 Ejercicio 1: Auditoría de Alumnos</h3>
     
-    <pre><code>
+   <pre><code>
     /* Tabla Histórica */
     CREATE TABLE alumnos_historico (
         dni INT(11) NOT NULL,
@@ -816,13 +810,13 @@
         );
     END //
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 3: Mantenimiento Automático de Contadores</h3>
+   <h3>🔹 Ejercicio 3: Mantenimiento Automático de Contadores</h3>
     
-    <pre><code>
+   <pre><code>
     /* Al Inscribir */
     DELIMITER //
     CREATE TRIGGER `inscripciones_after_ins_tr` AFTER INSERT ON `inscripciones`
@@ -852,13 +846,13 @@
             AND nro_curso = OLD.nro_curso;
     END //
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
-    <br><hr><br>
+   <br><hr><br>
 
-    <h3>🔹 Ejercicio 4: Auditoría de Usuario (Before Insert)</h3>
+   <h3>🔹 Ejercicio 4: Auditoría de Usuario (Before Insert)</h3>
     
-    <pre><code>
+   <pre><code>
     DELIMITER //
     CREATE TRIGGER valores_plan_before_ins_tr BEFORE INSERT ON valores_plan
     FOR EACH ROW
@@ -866,7 +860,7 @@
         SET NEW.usuario_alta = CURRENT_USER;
     END //
     DELIMITER ;
-    </code></pre>
+   </code></pre>
 
 </body>
 </html>
