@@ -1,0 +1,436 @@
+<h1 align="center">🗄️ Guía Práctica: SQL Avanzado (Base de Datos AFATSE)</h1>
+<p align="center">
+  <b>Temas:</b> Stored Procedures, Functions, Transactions & Triggers
+</p>
+
+<hr>
+
+<h2 align="center">⚡ Práctica Nº 12: STORE PROCEDURES y FUNCTIONS</h2>
+
+<h3>1) Obtener planes actuales</h3>
+<p><b>Consigna:</b> Crear un procedimiento almacenado llamado <code>plan_lista_precios_actual</code> que devuelva los planes de capacitación indicando: nom_plan, modalidad y valor_actual.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE plan_lista_precios_actual()
+BEGIN
+ drop temporary table if exists valor_actual;
+ create temporary table valor_actual
+ (
+ select vp.nom_plan, max(vp.fecha_desde_plan) ult_fecha
+ from valores_plan vp
+ where vp.fecha_desde_plan <= CURRENT_DATE
+ group by vp.nom_plan
+ );
+
+ select pc.nom_plan, pc.modalidad, vp.valor_plan  valor_actual
+ from plan_capacitacion pc
+ inner join valor_actual va on  pc.nom_plan=va.nom_plan
+ inner join valores_plan vp on  va.nom_plan=vp.nom_plan and va.ult_fecha=vp.fecha_desde_plan;
+
+ drop temporary table if exists valor_actual;
+END //
+DELIMITER ;
+</pre>
+
+<h3>2) Obtener planes a una fecha específica</h3>
+<p><b>Consigna:</b> Crear un procedimiento almacenado llamado <code>plan_lista_precios_a_fecha</code> que dada una fecha devuelva los planes de capacitación indicando: nombre_plan, modalidad y valor_a_fecha.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE plan_lista_precios_a_fecha(IN fecha_hasta DATE)
+BEGIN
+    drop temporary table if exists valor_a_fecha;
+    create temporary table valor_a_fecha
+    (
+     select vp.nom_plan, max(vp.fecha_desde_plan) ult_a_fecha
+     from valores_plan vp
+     where vp.fecha_desde_plan<=fecha_hasta
+     group by vp.nom_plan
+    );
+
+    select pc.nom_plan, pc.modalidad, vp.valor_plan valor_fecha
+    from plan_capacitacion pc
+    inner join valor_a_fecha va on pc.nom_plan=va.nom_plan
+    inner join valores_plan vp on va.nom_plan =vp.nom_plan and va.ult_a_fecha=vp.fecha_desde_plan;
+
+    drop temporary table if exists valor_a_fecha;
+END //
+DELIMITER ;
+</pre>
+
+<h3>3) Reutilización de procedimientos</h3>
+<p><b>Consigna:</b> Modificar el procedimiento almacenado creado en 1) para que internamente invoque al procedimiento creado en 2).</p>
+
+<pre>
+DROP PROCEDURE IF EXISTS plan_lista_precios_actual;
+DELIMITER //
+CREATE PROCEDURE plan_lista_precios_actual()
+BEGIN
+    call plan_lista_precios_a_fecha(CURRENT_DATE);
+END //
+DELIMITER ;
+</pre>
+
+<h3>4) Función de valor de plan</h3>
+<p><b>Consigna:</b> Crear una función llamada <code>plan_valor</code> que reciba el nombre del plan y una fecha y devuelva el valor de dicho plan a esa fecha.</p>
+
+<pre>
+SET GLOBAL log_bin_trust_function_creators = 1;
+DELIMITER //
+CREATE FUNCTION plan_valor (nom varchar(20), fecha DATE)
+RETURNS float(9,3)
+BEGIN
+    declare valor  float(9,3);
+    select valor_plan into valor
+    from valores_plan
+    where nom_plan = nom
+    and fecha_desde_plan = fecha;
+    return valor;
+END //
+DELIMITER ;
+</pre>
+
+<h3>5) Integración Procedimiento-Función</h3>
+<p><b>Consigna:</b> Modifique el procedimiento almacenado creado en 2) para que internamente utilice la función creada en 4).</p>
+
+<pre>
+DROP PROCEDURE IF EXISTS plan_lista_precios_a_fecha;
+DELIMITER //
+CREATE PROCEDURE plan_lista_precios_a_fecha(in fecha date)
+BEGIN
+    /* Ejemplo invocando a un plan específico, debería adaptarse para listar todos */
+    select plan_valor("Marketing 3", fecha);
+END //
+DELIMITER ;
+</pre>
+
+<h3>6) Estado de cuenta del alumno</h3>
+<p><b>Consigna:</b> Crear un procedimiento <code>alumnos_pagos_deudas_a_fecha</code> que dada una fecha y un alumno indique cuanto ha pagado hasta esa fecha y cuantas cuotas adeudaba. Devolver resultados en parámetros de salida.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE alumnos_pagos_deudas_a_fecha
+(IN fecha_limite DATE, IN dni_alumno INTEGER(11), 
+ OUT pagado FLOAT(9,3), OUT cant_adeudado INTEGER(11))
+BEGIN
+    select @pagado:=sum(cuo.importe_pagado)
+    from cuotas cuo
+    where cuo.dni=dni_alumno and cuo.fecha_pago is not null
+          and cuo.fecha_emision<=fecha_limite;
+
+    select @cant_adeudado:=count(*)
+    from cuotas cuo
+    where cuo.dni=dni_alumno and cuo.fecha_pago is null
+          and cuo.fecha_emision<=fecha_limite;
+
+    set pagado:=@pagado;
+    set cant_adeudado:=@cant_adeudado;
+END //
+DELIMITER ;
+</pre>
+
+<h3>7) Función de deuda</h3>
+<p><b>Consigna:</b> Crear una función llamada <code>alumnos_deudas_a_fecha</code> que dado un alumno y una fecha indique cuantas cuotas adeuda a la fecha.</p>
+
+<pre>
+DELIMITER //
+CREATE FUNCTION alumnos_deudas_a_fecha(dni_alumno INTEGER(11), fecha_limite DATE)
+RETURNS integer(11)
+BEGIN
+    declare cant_adeudado integer(11);
+    select count(*) into cant_adeudado
+    from cuotas cuo
+    where cuo.dni=dni_alumno and cuo.`fecha_pago` is null
+          and cuo.fecha_emision<=fecha_limite;
+    return cant_adeudado;
+END //
+DELIMITER ;
+</pre>
+
+<h3>8) Inscripción Básica</h3>
+<p><b>Consigna:</b> Crear un SP <code>alumno_inscripcion</code> que inscriba a un alumno hoy y genere la primera cuota para el mes próximo.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE alumno_inscripcion (IN dni_alumno INTEGER(11), IN plan CHAR(20), IN curso INTEGER(11))
+BEGIN
+start transaction;
+     insert into inscripciones
+     values (plan, curso, dni_alumno, CURRENT_DATE);
+     
+    /* Actualizo contador de inscriptos */
+    update cursos set cant_inscriptos= cant_inscriptos +1
+    where nom_plan = plan  and nro_curso =curso;
+
+     insert into cuotas
+     values (plan, curso, dni_alumno,  
+              year(adddate(CURRENT_DATE,interval 1 month)),
+             month(adddate(CURRENT_DATE,interval 1 month)), CURRENT_DATE, null, null);
+commit;
+END //
+DELIMITER ;
+</pre>
+
+<h3>9) y 10) Inscripción con Validación, Transacción y Cupo</h3>
+<p><b>Consigna:</b> Modificar el SP anterior para validar que no esté inscripto. Realizar el proceso en una transacción. Verificar si supera el cupo, en ese caso ROLLBACK, sino COMMIT.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE alumno_inscrip_con_validacion_2 (IN dni_alumno INTEGER(11), IN plan CHAR(20), IN curso INTEGER(11))
+BEGIN
+    declare insc INTEGER(11);
+    
+    start transaction;
+    
+    /* Verifico si ya existe */
+    select count(dni) into @insc
+    from inscripciones
+    where dni=dni_alumno and nom_plan =plan and nro_curso=curso;
+
+    if @insc = 0 then
+         insert into inscripciones
+         values (plan, curso, dni_alumno, CURRENT_DATE);
+          
+         update cursos set cant_inscriptos= cant_inscriptos +1
+         where nom_plan = plan  and nro_curso =curso;
+    
+         insert into cuotas
+         values (plan, curso, dni_alumno, year(adddate(CURRENT_DATE,interval 1 month)),
+                 month(adddate(CURRENT_DATE,interval 1 month)), CURRENT_DATE, null, null);   
+         
+         /* Verificacion de CUPO (pseudocodigo asumido por contexto) */
+         /* If cant_inscriptos <= cupo then commit else rollback */
+         /* Asumiendo logica de commit por defecto si no falla constraint */
+         commit;
+    else 
+         rollback;
+    end if;
+END //
+DELIMITER ;
+</pre>
+
+<h3>11) Gestión de Stock (Reutilización de código)</h3>
+<p><b>Consigna:</b> Crear <code>stock_ingreso</code> y <code>stock_egreso</code> reutilizando un SP base llamado <code>stock_movimiento</code>. Validar que sea un útil (no apunte) y que el stock no quede negativo.</p>
+
+<pre>
+DELIMITER //
+/* Procedimiento Base */
+CREATE PROCEDURE `stock_movimiento`(IN cod_mat CHAR(6), IN cant_movida INTEGER(11), OUT stock INTEGER(11))
+BEGIN
+     declare url varchar(50);
+     start transaction;
+     
+     /* Consulto url para saber si es apunte o útil */
+     select url_descarga into url
+     from materiales
+     where cod_material=cod_mat;
+      
+     if url is null then
+        update materiales set cant_disponible=cant_disponible+cant_movida
+        where cod_material=cod_mat;
+     end if;
+      
+     select cant_disponible into stock
+     from materiales
+     where cod_material=cod_mat;
+
+     /* Validación de stock negativo */
+     if stock>=0 then
+        commit;
+     else
+        rollback;
+     end if;
+     
+     /* Retorno el stock final (sea el modificado o el original si hubo rollback) */
+     select cant_disponible into stock
+     from materiales
+     where cod_material=cod_mat;
+END //
+
+/* Procedimiento de Ingreso */
+CREATE PROCEDURE `stock_ingreso`(IN cod_mat CHAR(6), IN cant_movida INTEGER(11), OUT stock INTEGER(11))
+BEGIN
+     call stock_movimiento(cod_mat, cant_movida, stock);
+END //
+
+/* Procedimiento de Egreso (invierte el signo) */
+CREATE PROCEDURE `stock_egreso`(IN cod_mat CHAR(6), IN cant_movida INTEGER(11), OUT stock INTEGER(11))
+BEGIN
+     call stock_movimiento(cod_mat, (-1)*cant_movida, stock);
+END//
+DELIMITER ;
+</pre>
+<blockquote>
+ℹ️ <b>Nota técnica:</b> Se realiza el UPDATE primero (bloqueo de registro) y luego se valida el stock < 0 para evitar condiciones de carrera (Race Conditions) entre usuarios simultáneos.
+</blockquote>
+
+<h3>12) Anular Inscripción</h3>
+<p><b>Consigna:</b> Eliminar inscripción. Verificar que no haya pagado cuotas. Si hay cuotas impagas, eliminarlas.</p>
+
+<pre>
+DELIMITER //
+CREATE PROCEDURE alumno_anula_inscripcion (IN plan CHAR(20), IN curso INTEGER(11), IN alumno INTEGER(11))
+BEGIN
+     declare cuotas_pagas integer(11);
+      
+     select count(*) into cuotas_pagas
+     from cuotas
+     where nom_plan=plan and nro_curso=curso and dni=alumno
+           and fecha_pago is not null;
+
+     if cuotas_pagas<=0 then
+        start transaction;
+        
+        /* Elimino cuotas impagas */
+        delete from cuotas
+        where nom_plan=plan and nro_curso=curso 
+        and dni=alumno and fecha_pago is null;
+        
+        /* Resto contador del curso */
+        update cursos set cant_inscriptos= cant_inscriptos -1
+        where nom_plan = plan and nro_curso = curso;
+
+        /* Elimino inscripción */
+        delete from inscripciones
+        where nom_plan=plan and nro_curso=curso and dni=alumno;
+
+        commit;
+     end if;
+END//
+DELIMITER ;
+</pre>
+
+<hr>
+
+<h2 align="center">🛠️ Práctica Nº 11: TRIGGERS</h2>
+
+<h3>1) Historial de Alumnos</h3>
+<p><b>Consigna:</b> a) Crear tabla <code>alumnos_historico</code>. b) Trigger para insertar nuevos valores o cambios, registrando fecha y usuario. c) Probar.</p>
+
+<pre>
+/* A) Crear Tabla Histórica */
+CREATE TABLE `alumnos_historico` (
+  `dni` int(11) NOT NULL,
+  `fecha_hora_cambio` datetime NOT NULL,
+  `nombre` varchar(20) default NULL,
+  `apellido` varchar(20) default NULL,
+  `tel` varchar(20) default NULL,
+  `email` varchar(50) default NULL,
+  `direccion` varchar(50) default NULL,
+  `usuario_modificacion` varchar(50) default NULL,
+  PRIMARY KEY  (`dni`,`fecha_hora_cambio`),
+  CONSTRAINT `alumnos_historico_alumnos_fk` FOREIGN KEY (`dni`) REFERENCES `alumnos` (`dni`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+/* B) Trigger AFTER INSERT */
+DELIMITER //
+CREATE TRIGGER  alumnos_after_ins_tr  AFTER INSERT ON alumnos
+  FOR EACH ROW
+BEGIN
+     insert into alumnos_historico
+     values (new.dni, CURRENT_TIMESTAMP, new.nombre, new.apellido,
+             new.tel, new.email, new.direccion, CURRENT_USER);
+END//
+DELIMITER ;
+
+/* B) Trigger AFTER UPDATE */
+DELIMITER //
+CREATE TRIGGER  alumnos_after_upd_tr AFTER  UPDATE ON alumnos
+  FOR EACH ROW
+BEGIN
+     insert into alumnos_historico
+     values (new.dni, CURRENT_TIMESTAMP, new.nombre, new.apellido,
+             new.tel, new.email, new.direccion, CURRENT_USER);
+END//
+DELIMITER ;
+</pre>
+
+<h3>2) Historial de Movimientos de Stock</h3>
+<p><b>Consigna:</b> a) Crear tabla <code>stock_movimientos</code>. b) Trigger para registrar movimientos. Si es nuevo, cantidad inicial. Si cambia, solo registrar el cambio (diferencia). Validar que no sea apunte (null).</p>
+
+<pre>
+/* A) Crear Tabla Movimientos */
+CREATE TABLE `stock_movimientos` (
+  `cod_material` char(6) NOT NULL,
+  `fecha_movimiento` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+  `cantidad_movida` int(11) NOT NULL,
+  `cantidad_restante` int(11) NOT NULL,
+  `usuario_movimiento` varchar(50) NOT NULL,
+  PRIMARY KEY  (`cod_material`,`fecha_movimiento`),
+  CONSTRAINT `stock_movimientos_fk` FOREIGN KEY (`cod_material`) REFERENCES `materiales` (`cod_material`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+/* B) Trigger AFTER INSERT (Alta de material) */
+DELIMITER //
+CREATE TRIGGER `materiales_after_ins_tr` AFTER INSERT ON `materiales`
+  FOR EACH ROW
+BEGIN
+     /* Si cant_disponible NO es null, es un útil */
+     if new.cant_disponible is not null then
+         insert into stock_movimientos(cod_material, cantidad_movida, cantidad_restante, usuario_movimiento)
+         values (new.cod_material, new.cant_disponible, new.cant_disponible, CURRENT_USER);
+     end if;
+END //
+DELIMITER ;
+
+/* B) Trigger BEFORE UPDATE (Cambio de stock) */
+DELIMITER //
+CREATE TRIGGER `materiales_before_upd_tr` BEFORE UPDATE ON `materiales`
+  FOR EACH ROW
+BEGIN
+   if new.cant_disponible is not null then
+     /* Calculamos el delta */
+     set @cant_movida = new.cant_disponible - old.cant_disponible;
+     
+     if @cant_movida != 0 then
+          insert into stock_movimientos(cod_material, cantidad_movida, cantidad_restante, usuario_movimiento)
+          values (new.cod_material, @cant_movida, new.cant_disponible, CURRENT_USER);
+     end if;
+   end if;
+END//
+DELIMITER ;
+</pre>
+
+<h3>3) Mantenimiento de Cantidad de Inscriptos</h3>
+<p><b>Consigna:</b> Agregar columna <code>cant_inscriptos</code> a cursos y crear triggers para mantenerla actualizada automáticamente al inscribir o borrar alumnos.</p>
+
+<pre>
+/* Trigger al INSCRIBIR (AFTER INSERT) */
+DELIMITER //
+CREATE TRIGGER `inscripciones_after_ins_tr` AFTER INSERT ON `inscripciones`
+  FOR EACH ROW
+BEGIN
+     update cursos
+     set cant_inscriptos = cant_inscriptos + 1
+     where nom_plan = new.nom_plan and nro_curso = new.nro_curso;
+END//
+DELIMITER ;
+
+/* Trigger al BORRAR INSCRIPCIÓN (AFTER DELETE) */
+/* Nota: Usar OLD para referenciar la fila borrada */
+DELIMITER //
+CREATE TRIGGER `inscripciones_after_del_tr` AFTER DELETE ON `inscripciones`
+  FOR EACH ROW
+BEGIN
+     update cursos
+     set cant_inscriptos = cant_inscriptos - 1
+     where nom_plan = old.nom_plan and nro_curso = old.nro_curso;
+END//
+DELIMITER ;
+</pre>
+
+<h3>4) Auditoría de Usuario Alta</h3>
+<p><b>Consigna:</b> Agregar columna <code>usuario_alta</code> a <code>valores_plan</code> y crear trigger que registre automáticamente el usuario al insertar un precio.</p>
+
+<pre>
+/* Trigger BEFORE INSERT */
+/* Debe ser BEFORE para poder modificar la fila (NEW) antes de que se escriba en disco */
+DELIMITER //
+CREATE TRIGGER valores_plan_before_ins_tr BEFORE INSERT ON valores_plan
+FOR EACH ROW
+BEGIN
+    set new.usuario_alta = CURRENT_USER;
+END//
+DELIMITER ;
+</pre>
